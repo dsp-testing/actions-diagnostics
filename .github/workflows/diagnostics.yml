@@ -1,0 +1,83 @@
+name: Test Diagnostic Workflow
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnostics:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v2
+
+      - name: Set up Docker
+        uses: docker/setup-buildx-action@v1
+
+      - name: Network Diagnostics
+        run: |
+          echo "Running network diagnostics..." | tee network_diagnostics.log
+
+          # DNS Resolution Test
+          echo "Testing DNS resolution for example.com..." | tee -a network_diagnostics.log
+          nslookup example.com 2>&1 | tee -a network_diagnostics.log
+
+          # Docker DNS Resolution Test
+          echo "Testing DNS resolution for example.com within Docker..." | tee -a network_diagnostics.log
+          docker run --rm alpine nslookup example.com 2>&1 | tee -a network_diagnostics.log
+
+          # Docker Daemon Configuration Check
+          echo "Checking Docker daemon configuration..." | tee -a network_diagnostics.log
+          sudo cat /etc/docker/daemon.json 2>&1 | tee -a network_diagnostics.log || echo "No daemon.json found" | tee -a network_diagnostics.log
+
+      - name: Curl Requests with Verbose Logging
+        run: |
+          echo "Running curl requests with verbose logging..." | tee curl_requests.log
+
+          # Curl request with verbose logging and following redirects
+          curl -vL https://example.com 2>&1 | tee -a curl_requests.log
+
+          # Additional curl requests for other test URLs
+          curl -vL https://httpbin.org/get 2>&1 | tee -a curl_requests.log
+
+      - name: Docker Container Diagnostics
+        run: |
+          echo "Running diagnostics within Docker container..." | tee docker_container_diagnostics.log
+
+          # Run diagnostics within a Docker container
+          docker run --rm alpine sh -c "
+            echo 'DNS Resolution within Docker container...'
+            nslookup example.com
+
+            echo 'Downloading file within Docker container...'
+            apk add --no-cache curl
+            curl -vL https://example.com
+          " 2>&1 | tee -a docker_container_diagnostics.log
+
+      - name: Additional Network Tools
+        run: |
+          echo "Running additional network tools..." | tee additional_network_tools.log
+
+          # Ping test
+          echo "Pinging example.com..." | tee -a additional_network_tools.log
+          ping -c 4 example.com 2>&1 | tee -a additional_network_tools.log || echo "Ping failed" | tee -a additional_network_tools.log
+
+          # Traceroute test
+          echo "Traceroute to example.com..." | tee -a additional_network_tools.log
+          traceroute example.com 2>&1 | tee -a additional_network_tools.log || echo "Traceroute not installed or failed" | tee -a additional_network_tools.log
+
+          # Check for open ports
+          echo "Checking open ports on example.com..." | tee -a additional_network_tools.log
+          sudo apt-get update && sudo apt-get install -y nmap 2>&1 | tee -a additional_network_tools.log
+          nmap -p 80 example.com 2>&1 | tee -a additional_network_tools.log
+
+      - name: Upload Diagnostic Logs
+        uses: actions/upload-artifact@v3
+        with:
+          name: diagnostic-logs
+          path: |
+            network_diagnostics.log
+            curl_requests.log
+            docker_container_diagnostics.log
+            additional_network_tools.log
+
